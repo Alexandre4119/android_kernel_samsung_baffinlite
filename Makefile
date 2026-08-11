@@ -4,6 +4,10 @@ SUBLEVEL = 5
 EXTRAVERSION =
 NAME = Saber-toothed Squirrel
 
+# Build identity shown in /proc/version (Settings > About > Kernel version)
+export KBUILD_BUILD_USER := alexandre4119
+export KBUILD_BUILD_HOST := wdgaster
+
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
 # More info can be located in ./README

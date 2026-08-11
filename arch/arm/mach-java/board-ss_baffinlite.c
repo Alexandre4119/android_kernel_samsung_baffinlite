@@ -32,6 +32,9 @@
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/memblock.h>
+#include <linux/persistent_ram.h>
+#include <linux/sizes.h>
 #include <linux/mfd/bcm590xx/pmic.h>
 #include <linux/of_platform.h>
 #include <linux/of.h>
@@ -2473,10 +2476,48 @@ static void hawaii_mem_reserve(void)
 }
 #endif
 
+#define RAM_CONSOLE_SIZE	(SZ_128K)
+#define RAM_CONSOLE_ALIGN	SZ_4K
+
+static struct persistent_ram_descriptor ram_console_descs[] = {
+	{
+		.name	= "ram_console",
+		.size	= RAM_CONSOLE_SIZE,
+	},
+};
+
+static struct persistent_ram ram_console_ram = {
+	.num_descs	= ARRAY_SIZE(ram_console_descs),
+	.descs		= ram_console_descs,
+};
+
+static void __init ram_console_reserve_mem(void)
+{
+	phys_addr_t start;
+
+	start = memblock_alloc_from_range(RAM_CONSOLE_SIZE,
+		RAM_CONSOLE_ALIGN, PHYS_OFFSET, PHYS_OFFSET + SZ_1G);
+	if (!start) {
+		pr_err("ram_console: no free memory to reserve\n");
+		return;
+	}
+	memblock_free(start, RAM_CONSOLE_SIZE);
+
+	ram_console_ram.start = start;
+	ram_console_ram.size = RAM_CONSOLE_SIZE;
+	persistent_ram_early_init(&ram_console_ram);
+}
+
+static struct platform_device ram_console_device = {
+	.name		= "ram_console",
+	.id		= -1,
+};
+
 static void hawaii_sec_mem_reserve(void)
 {
 	secure_mem_device.dev.platform_data = &secure_mem_plat_data;
 	hawaii_reserve();
+	ram_console_reserve_mem();
 }
 
 static void __init hawaii_add_sdio_devices(void)
@@ -2658,6 +2699,7 @@ static void __init ldi_mdnie_init(void)
 static void __init hawaii_init(void)
 {
 	hawaii_add_devices();
+	platform_device_register(&ram_console_device);
 #ifdef CONFIG_FB_BRCM_KONA
 	konafb_init();
 #endif
